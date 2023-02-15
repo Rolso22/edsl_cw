@@ -31,7 +31,6 @@ struct Fragment {
 template <TokType t>
 struct Token : public pe::Token<TokType, Fragment>
 {
-    Token() : pe::Token<TokType, Fragment>(t) {}
     Token(Fragment pos) : pe::Token<TokType, Fragment>(t, pos)
     {
         /* пусто */
@@ -41,7 +40,6 @@ struct Token : public pe::Token<TokType, Fragment>
 template <>
 struct Token<VARNAME> : public pe::AttrToken<TokType, Fragment, std::string>
 {
-    Token() : pe::AttrToken<TokType, Fragment, std::string>(VARNAME) {}
     Token(Fragment pos, const std::string& name) : pe::AttrToken<TokType, Fragment, std::string>(VARNAME, pos, name)
     {
         /* пусто */
@@ -51,7 +49,6 @@ struct Token<VARNAME> : public pe::AttrToken<TokType, Fragment, std::string>
 template <>
 struct Token<NUMBER> : public pe::AttrToken<TokType, Fragment, double>
 {
-    Token() : pe::AttrToken<TokType, Fragment, double>(NUMBER) {}
     Token(Fragment pos, double value) : pe::AttrToken<TokType, Fragment, double>(NUMBER, pos, value)
     {
         /* пусто */
@@ -61,7 +58,6 @@ struct Token<NUMBER> : public pe::AttrToken<TokType, Fragment, double>
 template <>
 struct Token<STRING> : public pe::AttrToken<TokType, Fragment, std::string>
 {
-    Token() : pe::AttrToken<TokType, Fragment, std::string>(STRING) {}
     Token(Fragment pos, const std::string& text) : pe::AttrToken<TokType, Fragment, std::string>(STRING, pos, text)
     {
         /* пусто */
@@ -194,24 +190,26 @@ using Term = pe::Terminal<TokType, Token, t>;
 //        (pe::Rule() << Term<NUMBER>() << A << Term<PLUS>() << [](double x) -> double {return x;}
 //        | pe::Rule() << Term<NUMBER>() << []() -> double {return 5.0;})
 //;
-
+//
 //pe::NTerm<TokType, double> B =
 //        pe::NTerm<TokType, double>("B")
 //        | pe::Rule() << A << Term<NUMBER>() << Term<PLUS>() << Term<NUMBER>() << [](double x, double y) -> double {return x + y;}
 //        | pe::Rule() << Term<NUMBER>() << Term<MINUS>() << Term<NUMBER>() << A << [](double x, double y) -> double {return x - y;}
 //;
-
+//
 //pe::NTerm<TokType, void> C =
 //        pe::NTerm<TokType, void>("C")
 //        | pe::Chain<TokType, pe::Nil>() << A << A << Term<PLUS>()
 //        | pe::Chain<TokType, pe::Nil>() << Term<MINUS>() << []() -> void {std::cout << "plus";}
 //;
+
 extern pe::NTerm<TokType, void> A;
 
 pe::NTerm<TokType, void> C =
         pe::NTerm<TokType, void>("C")
+        | pe::Rule() << A
         | pe::Rule() << C << Term<PLUS>() << A
-        | pe::Rule() << Term<MINUS>() << []() -> void {std::cout << "plus";}
+        | pe::Rule() << C << Term<MINUS>() << A
 ;
 
 pe::NTerm<TokType, void> A =
@@ -221,7 +219,8 @@ pe::NTerm<TokType, void> A =
 
 pe::NTerm<TokType, void> D =
         pe::NTerm<TokType, void>("D")
-        | pe::Chain<TokType, pe::Nil>() << C
+        | pe::Rule() << C
+        | pe::Rule() << D << Term<SEMICOLON>() << C
 ;
 
 // упрощенная грамматика для отладки
@@ -260,8 +259,9 @@ std::map<std::string, double> variables;
 pe::NTerm<TokType, double*> Variable =
         pe::NTerm<TokType, double*>("Variable")
         | pe::Rule() << Term<VARNAME>() <<
-                     [](std::string name)-> double* {
-                         return &variables[name];
+                     [](const std::string& name)-> double* {
+                        std::cout << "variable: " << name << std::endl;
+                        return &variables[name];
                      }
 ;
 
@@ -271,7 +271,7 @@ pe::NTerm<TokType, double> ExprTerm =
         pe::NTerm<TokType, double>("ExprTerm")
         | pe::Rule() << Factor
         | pe::Rule() << ExprTerm << Term<MUL>() << Factor <<
-                     [](double x, double y) -> double { return x * y; }
+                     [](double x, double y) -> double { std::cout << "mul: " << x << ", " << y << std::endl; return x * y; }
         | pe::Rule() << ExprTerm << Term<DIV>() << Factor <<
                      [](double x, double y) -> double { return x / y; }
 ;
@@ -285,66 +285,69 @@ pe::NTerm<TokType, double> Factor =
 
 
 // Лексический анализатор
-struct MyLexer {
-    Fragment fr = Fragment({{0, 0}, {0, 0}});
+struct MyLexer : public pe::Lexer<TokType, Fragment> {
+    std::string file_path;
+    int begin = 1;
     std::fstream file;
 
-    MyLexer() {
-        file.open("/home/ramagf/CLionProjects/edsl_cw/input.txt",ios::in);
+    MyLexer(const char *input_file) {
+        file_path = input_file;
+        file.open(file_path,ios::in);
         if (file.is_open()) {
             std::cout << "open" << std::endl;
         }
-    }
+    };
 
-    pe::Token<TokType, Fragment>* get_type(const std::string& t) const {
+    pe::Token<TokType, Fragment>* get_type(const std::string& t) {
         std::string delimiter = " ";
         std::string token = t.substr(0, t.find(delimiter));
         if (token == "PLUS") {
-            return new Token<PLUS>(fr);
+            return new Token<PLUS>(Fragment({{begin, 0}, {begin++, 4}}));
         }
         if (token == "MINUS") {
-            return new Token<MINUS>(fr);
+            return new Token<MINUS>(Fragment({{begin, 0}, {begin++, 5}}));
         }
         if (token == "MUL") {
-            return new Token<MUL>(fr);
+            return new Token<MUL>(Fragment({{begin, 0}, {begin++, 3}}));
         }
         if (token == "DIV") {
-            return new Token<DIV>(fr);
+            return new Token<DIV>(Fragment({{begin, 0}, {begin++, 3}}));
         }
         if (token == "SET") {
-            return new Token<SET>(fr);
+            return new Token<SET>(Fragment({{begin, 0}, {begin++, 3}}));
         }
         if (token == "SEMICOLON") {
-            return new Token<SEMICOLON>(fr);
+            return new Token<SEMICOLON>(Fragment({{begin, 0}, {begin++, 7}}));
         }
         if (token == "COMMA") {
-            return new Token<COMMA>(fr);
+            return new Token<COMMA>(Fragment({{begin, 0}, {begin++, 5}}));
         }
         if (token == "LP") {
-            return new Token<LP>(fr);
+            return new Token<LP>(Fragment({{begin, 0}, {begin++, 2}}));
         }
         if (token == "RP") {
-            return new Token<RP>(fr);
+            return new Token<RP>(Fragment({{begin, 0}, {begin++, 2}}));
         }
         if (token == "PRINT") {
-            return new Token<PRINT>(fr);
+            return new Token<PRINT>(Fragment({{begin, 0}, {begin++, 5}}));
         }
         if (token == "READ") {
-            return new Token<READ>(fr);
+            return new Token<READ>(Fragment({{begin, 0}, {begin++, 4}}));
         }
         if (token == "NUMBER") {
             std::string value = t.substr(t.find(delimiter));
-            return new Token<NUMBER>(fr, std::stod(value));
+            return new Token<NUMBER>(Fragment({{begin, 0}, {begin++, 6}}), std::stod(value));
         }
         if (token == "VARNAME") {
             std::string value = t.substr(t.find(delimiter));
-            return new Token<VARNAME>(fr, value);
+            value = value.substr(1, value.size());
+            return new Token<VARNAME>(Fragment({{begin, 0}, {begin++, 6}}), value);
         }
         if (token == "STRING") {
             std::string value = t.substr(t.find(delimiter));
-            return new Token<STRING>(fr, value);
+            return new Token<STRING>(Fragment({{begin, 0}, {begin++, 6}}), value);
         }
-        return new Token<END_OF_TEXT>(fr);
+        return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
     }
 
     pe::Token<TokType, Fragment>* next_token() {
@@ -352,63 +355,31 @@ struct MyLexer {
             string tp;
             getline(file, tp);
             if (tp.empty()) {
-                return new Token<END_OF_TEXT>(fr);
+                return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
             }
             pe::Token<TokType, Fragment>* t = get_type(tp);
 //            std::cout << "type_: " << t->type << std::endl;
             return t;
+        } else {
+            std::cout << "file is closed" << std::endl;
         }
-        return new Token<END_OF_TEXT>(fr);
+        return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
     }
 };
 
 // Основная программа
 int main(int argc, char *argv[]) {
-////    if (argc > 1) {
-////        MyLexer lexer(argv[1]);
-////        Program.compile_tables();
-////        Program.parse(lexer);
-////    }
-//    auto fr = Fragment({{0, 0}, {0, 0}});
-//
-//    auto tt = Term<NUMBER>();
-//    auto t = Token<PLUS>(fr);
-//    auto vt = Token<VARNAME>(fr, "x");
-//    auto nt = Token<NUMBER>(fr, 5.0);
-//    auto st = Token<STRING>(fr, "text");
-//    std::cout << static_cast<char>(t.type) << std::endl;
-//    std::cout << static_cast<char>(vt.type) << std::endl;
-//    std::cout << static_cast<char>(nt.type) << std::endl;
-//    std::cout << static_cast<char>(st.type) << std::endl;
-//    auto *gr = new Grammar({new NonTerminal("P", {"P ';' O", "O"}),
-//                               new NonTerminal("O", {"AO"}),
-//                               new NonTerminal("AO", {"V '=' ET"}),
-//                               new NonTerminal("V", {"'vn'"}),
-//                               new NonTerminal("ET", {"F", "ET '*' F"}),
-//                               new NonTerminal("F", {"'n'", "V"})});
-//    auto lalr_one = LalrOne(gr);
-//    std::cout << std::endl;
-//    auto mylexer = MyLexer();
-//    mylexer.next_token();
-//    mylexer.next_token();
-//    mylexer.next_token();
-//    auto tp = mylexer.next_token();
-//    std::cout << "type: " << tp->type << std::endl;
-//    if (tp->type == NUMBER) {
-//        std::cout << static_cast<pe::AttrToken<TokType, Fragment, double>*>(tp)->value << std::endl;
-//    }
-//    std::cout << "type: " << mylexer.next_token()->type << std::endl;
-//    std::cout << "type: " << mylexer.next_token()->type << std::endl;
-
-
+    if (argc > 1) {
+        MyLexer lexer(argv[1]);
+        Program.compile_table();
+        Program.parse(lexer);
+        std::cout << "x = " << variables["x"] << std::endl;
+    }
 
 //    A.print_rules();
 //    C.print_rules();
 //    D.print_rules();
-
-    Program.print_rules();
-//    B.compile_table();
-
+//    Program.compile_table();
 
     return 0;
 }

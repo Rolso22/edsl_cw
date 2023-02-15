@@ -4,9 +4,10 @@
 #include <iostream>
 #include <utility>
 #include <vector>
-#include <functional>
+#include <stack>
 #include "Grammar.h"
 #include "LalrOne.h"
+#include "attr_stack.h"
 
 namespace parser_edsl {
     template<typename TokType, typename Fragment> struct Token;
@@ -16,6 +17,16 @@ namespace parser_edsl {
     template<typename TokType, template<TokType> typename MyToken, TokType t> struct Terminal;
     template<typename TokType, typename Fragment, typename U> struct AttrToken;
 
+    template <typename TokType, typename Fragment>
+    struct Lexer {
+
+        virtual Token<TokType, Fragment>* next_token() {
+            std::cout << "next token" << std::endl;
+        }
+
+        virtual ~Lexer() {}
+    };
+
     struct Rule {};
 
     struct Nil {};
@@ -24,50 +35,6 @@ namespace parser_edsl {
     struct Cons {
         typedef H Head;
         typedef T Tail;
-    };
-
-    struct AttrStackItemBase {
-        AttrStackItemBase *next;
-
-        AttrStackItemBase(AttrStackItemBase *next): next(next) {}
-
-        virtual ~AttrStackItemBase() {}
-    };
-
-    template <typename T>
-    struct AttrStackItem : public AttrStackItemBase {
-        T value;
-
-        AttrStackItem(T value, AttrStackItemBase *next)
-            : AttrStackItemBase(next)
-            , value(value)
-        {}
-    };
-
-    class AttrStack {
-        AttrStackItemBase *stack;
-    public:
-        AttrStack(): stack(nullptr) {}
-
-        template <typename T>
-        void push(T value) {
-            stack = new AttrStackItem<T>(value, stack);
-        }
-
-        template <typename T>
-        T pop() {
-            auto top = dynamic_cast<AttrStackItem<T>*>(stack);
-            stack = stack->next;
-            T value = top->value;
-            delete top;
-            return value;
-        }
-    };
-
-    struct ActionBase {
-        virtual ~ActionBase() {}
-
-        virtual void apply(AttrStack &stack) = 0;
     };
 
     template <typename F, typename Attrs, typename Ret>
@@ -220,37 +187,6 @@ namespace parser_edsl {
 
     template <typename T> struct Type2Type {};
 
-//    template <typename TokType, typename Attrs, typename Action, typename Next>
-//    struct DelayedRuleStack {
-//        Chain<TokType, Attrs> chain;
-//        Action action;
-//        Next next;
-//
-//        DelayedRuleStack(Chain<TokType, Attrs> chain, Action action, Next next)
-//            : chain(chain), action(action), next(next)
-//        {}
-//
-//        DelayedRuleStack(ChainAction<TokType, Attrs, Action> ca, Next next)
-//            : chain(ca.chain), action(ca.action), next(next)
-//        {}
-//
-//        template <typename Ret>
-//        void add_rule_action(std::vector<RuleAction<TokType>> &rule_action, Type2Type<Ret> t2t) {
-//            rule_action.push_back(RuleAction<TokType>(chain.symbols, new ActionRet<Action, Attrs, Ret>(action)));
-//            next.add_rule_action(rule_action, t2t);
-//        }
-//
-//        void add_rule_action(std::vector<RuleAction<TokType>> &rule_action, Type2Type<void> t2t) {
-//            rule_action.push_back(RuleAction<TokType>(chain.symbols, new ActionNoRet<Action, Attrs>(action)));
-//            next.add_rule_action(rule_action, t2t);
-//        }
-//    };
-//
-//    struct EmptyStack {
-//        template <typename TokType, typename T2T>
-//        void add_rule_action(std::vector<RuleAction<TokType>> &, T2T) {}
-//    };
-
     template <typename T, typename Attrs>
     struct PushTokenAttr {
         static T* make_object();
@@ -310,11 +246,34 @@ namespace parser_edsl {
         std::vector<RuleAction<TokType>> rule_actions;
         std::string name;
 
-        NTermBase() {}
         NTermBase(std::string name) : name(std::move(name)) {}
     public:
         std::string get_name() {
             return name;
+        }
+
+        void create_rules(std::vector<std::pair<std::string, vector<std::pair<std::string, ActionBase*>>>>& str_rules, std::vector<std::string>& visited) {
+            visited.push_back(this->name);
+            std::cout << "create(" << this->name << ")\n";
+            vector<std::pair<std::string, ActionBase*>> action_prods;
+            for (auto rule : this->rule_actions) {
+                std::string str_rule;
+                for (auto s : rule.right) {
+                    if (s.is_terminal) {
+                        str_rule += (char) s.sym.term;
+                        str_rule += " ";
+                    } else {
+                        str_rule += s.sym.nterm->name;
+                        str_rule += " ";
+                        if (std::find(visited.begin(), visited.end(), s.sym.nterm->name) == visited.end()) {
+                            s.sym.nterm->create_rules(str_rules, visited);
+                        }
+                    }
+                }
+                str_rule = str_rule.substr(0, str_rule.length() - 1);
+                action_prods.push_back(std::make_pair(str_rule, rule.action));
+            }
+            str_rules.push_back(std::make_pair(this->name, action_prods));
         }
     };
 
@@ -343,16 +302,13 @@ namespace parser_edsl {
         Fragment pos;
         TokType type;
 
-        Token() {}
-        Token(TokType t) {
-            type = t;
-        }
         Token(TokType t, Fragment position) {
             pos = position;
             type = t;
-//            std::cout << "sizeof(TokType): " << sizeof(TokType) << std::endl;
-//            std::cout << "token: " << static_cast<char>(type) << " -> " << type << std::endl;
-//        std::cout << std::is_enum<TokType>() << std::endl;
+        }
+
+        virtual void get_attr(AttrStack& stack) {
+            std::cout << "token push nothing" << std::endl;
         }
     };
 
@@ -360,17 +316,17 @@ namespace parser_edsl {
     struct AttrToken  : public Token<TokType, Fragment> {
         Fragment pos;
         TokType type;
-        U value = 0;
+        U value;
 
-        AttrToken(TokType t) {
-            type = t;
-        }
         AttrToken(TokType t, Fragment position, U value) : Token<TokType, Fragment>(t, position) {
             this->value = value;
             type = t;
             pos = position;
-//            std::cout << "attr: " << static_cast<char>(type) << " -> " << type << std::endl;
-//            std::cout << "value: " << value << std::endl;
+        }
+
+        void get_attr(AttrStack& stack) override {
+            std::cout << "attr_token push value" << std::endl;
+            stack.template push(value);
         }
     };
 
@@ -385,7 +341,9 @@ namespace parser_edsl {
 
     template<typename TokType, typename U>
     struct NTerm: public NTermBase<TokType> {
-        std::vector<pair<std::string, vector<std::string>>> rules;
+        std::vector<std::pair<std::string, vector<std::pair<std::string, ActionBase*>>>> rules;
+        LalrOne lalr_one;
+        std::vector<std::tuple<std::string, int, ActionBase*>> all_action_rules;
 
         NTerm() : NTermBase<TokType>() {}
         NTerm(std::string name) : NTermBase<TokType>(name)
@@ -394,17 +352,17 @@ namespace parser_edsl {
         template <typename Attrs, typename Action>
         NTerm<TokType, U>& operator| (ChainAction<TokType, Attrs, Action> ca) {
             this->rule_actions.push_back(RuleAction<TokType>(ca.chain.symbols, make_action<Attrs>(ca.action, Type2Type<U>())));
-            for (auto rule : this->rule_actions) {
-                std::cout << "rule/op|(" << this->name << ", " << this << ") ";
-                for (auto s : rule.right) {
-                    if (s.is_terminal) {
-                        std::cout << "term: " << s.sym.term << ", ";
-                    } else {
-                        std::cout << "nterm: " << s.sym.nterm << "/" << s.sym.nterm->get_name() << ", ";
-                    }
-                }
-                std::cout << std::endl;
-            }
+//            for (auto rule : this->rule_actions) {
+//                std::cout << "rule/op|(" << this->name << ", " << this << ") ";
+//                for (auto s : rule.right) {
+//                    if (s.is_terminal) {
+//                        std::cout << "term: " << s.sym.term << ", ";
+//                    } else {
+//                        std::cout << "nterm: " << s.sym.nterm << "/" << s.sym.nterm->get_name() << ", ";
+//                    }
+//                }
+//                std::cout << std::endl;
+//            }
             return *this;
         }
 
@@ -427,18 +385,51 @@ namespace parser_edsl {
             return new ActionNoRet<Action, Attrs>(action);
         }
 
-        void create_rules(std::vector<pair<std::string, vector<std::string>>>& str_rules, std::vector<std::string> visited) {
-
-        }
-
         void compile_table() {
-            std::cout << "compile tables";
-
+            std::cout << "compile tables" << std::endl;
+            std::vector<std::string> visited;
+            this->create_rules(rules, visited);
+            for (auto rule : this->rules) {
+                std::cout << "rule(" << rule.first << "): ";
+                for (auto prod : rule.second) {
+                    std::cout << prod.first << ", ";
+                }
+                std::cout << std::endl;
+            }
+            std::list<NonTerminal*> nt_list;
+            for (auto rule : this->rules) {
+                nt_list.push_back(new NonTerminal(rule.first, rule.second));
+            }
+            auto *gr = new Grammar(nt_list, this->name);
+            this->all_action_rules = gr->action_productions;
+            lalr_one = LalrOne(gr);
         }
 
-        auto get_rules() {
-            return this->rule_actions;
-        };
+        template<typename Fragment>
+        void parse(Lexer<TokType, Fragment>& lexer) {
+            auto* stack = new AttrStack();
+            std::stack<int> state_stack;
+            state_stack.push(0);
+            auto next_token = lexer.next_token();
+            while (true) {
+                auto next_action = lalr_one.get_next_action(state_stack.top(), next_token->type);
+                if (next_action.first == "s") {
+                    next_token->get_attr(*stack);
+                    state_stack.push(next_action.second);
+                    next_token = lexer.next_token();
+                } else if (next_action.first == "r") {
+                    std::get<2>(all_action_rules[next_action.second])->apply(*stack);
+                    for (auto i = 0; i < std::get<1>(all_action_rules[next_action.second]); i++) {
+                        state_stack.pop();
+                    }
+                    auto next_state = lalr_one.get_next_goto(state_stack.top(), std::get<0>(all_action_rules[next_action.second]));
+                    state_stack.push(next_state);
+                } else {
+                    std::cout << "parsing is done: accept" << std::endl;
+                    break;
+                }
+            }
+        }
 
         void print_rules() {
             std::cout << "print_rules(" << this->get_name() << ")\n";
@@ -454,7 +445,6 @@ namespace parser_edsl {
                 std::cout << std::endl;
             }
         }
-
     };
 }
 

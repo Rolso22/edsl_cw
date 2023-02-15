@@ -24,6 +24,8 @@ public:
     vector<map<string, int>> goto_;
     vector<map<string, set<pair<string, int>>>> action;
 
+    LalrOne() {}
+
     LalrOne(Grammar* grammar) {
         gr = grammar;
 
@@ -41,20 +43,20 @@ public:
             symbols.push_back(nt->name);
         }
         auto ccol = get_cannonical_collection();
-        print_ccol(ccol);
+//        print_ccol(ccol);
         n_states = ccol.size();
         vector<set<pair<int, int>>> ccol_core;
         for (const auto& state : ccol) {
             ccol_core.push_back(drop_itemset_lookaheads(state));
         }
-        for (const auto& state : ccol_core) {
-            cout << "set{";
-            for (const auto& rule : state) {
-                cout << "(" << rule.first << ", " << rule.second << "), ";
-            }
-            cout << "}" << endl;
-        }
-        cout << endl;
+//        for (const auto& state : ccol_core) {
+//            cout << "set{";
+//            for (const auto& rule : state) {
+//                cout << "(" << rule.first << ", " << rule.second << "), ";
+//            }
+//            cout << "}" << endl;
+//        }
+//        cout << endl;
         map<set<pair<int, int>>, int> id_from_core;
         for (auto i = 0; i < ccol.size(); i++) {
             id_from_core[ccol_core[i]] = i;
@@ -134,11 +136,24 @@ public:
         print_action(action);
     }
 
+    pair<string, int> get_next_action(int state, int term) {
+        string s;
+        s += (char) term;
+        if (term == 0) {
+            s = "$end";
+        }
+        return *action[state][s].begin();
+    }
+
+    int get_next_goto(int state, const string& nterm) {
+        return goto_[state][nterm];
+    }
+
     void print_action(const vector<map<string, set<pair<string, int>>>>& act) {
         for (const auto& state : act) {
             cout << "{ ";
             for (const auto& rule : state) {
-                cout << rule.first << ": ";
+                cout << rule.first << " : ";
                 for (const auto& r : rule.second) {
                     cout << "(" << r.first << r.second << ")";
                 }
@@ -166,14 +181,14 @@ public:
         for (const auto& state : lr_zero.states) {
             kstates.push_back(lr_zero.kernels(state));
         }
-        cout << "kstates: ";
-        for (const auto& k : kstates) {
-            cout << "set";
-            for (auto st : k) {
-                cout << "(" << st.first << ", " << st.second << ")" << ", ";
-            }
-        }
-        cout << endl;
+//        cout << "kstates: ";
+//        for (const auto& k : kstates) {
+//            cout << "set";
+//            for (auto st : k) {
+//                cout << "(" << st.first << ", " << st.second << ")" << ", ";
+//            }
+//        }
+//        cout << endl;
         n_states = kstates.size();
         vector<map<pair<int, int>, LrZeroTableEntry*>> table;
         for (const auto& state : kstates) {
@@ -240,7 +255,7 @@ public:
                 }
             }
         }
-        print_table(table);
+//        print_table(table);
         vector<set<pair<pair<int, int>, string>>> result;
         for (auto i_state_id = 0; i_state_id < n_states; i_state_id++) {
             result.emplace_back();

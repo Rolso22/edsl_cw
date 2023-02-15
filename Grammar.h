@@ -6,6 +6,7 @@
 #include <vector>
 #include "list"
 #include "iostream"
+#include "attr_stack.h"
 
 using namespace std;
 
@@ -16,12 +17,13 @@ using namespace std;
 class NonTerminal {
 public:
     string name;
-    vector<vector<string>> productions;
+    vector<pair<vector<string>, ActionBase*>> productions;
     map<string, NonTerminal*> nt_by_name;
 
-    NonTerminal(string name, const list<string>& productions) {
+    NonTerminal(string name, const vector<std::pair<std::string, ActionBase*>>& productions) {
         this->name = move(name);
-        for (auto s : productions) {
+        for (const auto& pr : productions) {
+            auto s = pr.first;
             string delimiter = " ";
             size_t pos = 0;
             string token;
@@ -32,7 +34,7 @@ public:
                 s.erase(0, pos + delimiter.length());
             }
             lst.push_back(s);
-            this->productions.push_back(lst);
+            this->productions.push_back(make_pair(lst, pr.second));
         }
     }
 };
@@ -43,12 +45,13 @@ public:
     list<string> terminals;
     map<NonTerminal*, int> nonterm_offset;
     vector<pair<string, vector<string>>> productions;
+    vector<tuple<string, int, ActionBase*>> action_productions;
     vector<string> symbols;
     map<string, NonTerminal*> nt_by_name;
     map<string, set<string>> first_sets;
 
-    Grammar(list<NonTerminal*> nterms) {
-        auto* start_nonterminal = new NonTerminal("$accept", {nterms.front()->name});
+    Grammar(list<NonTerminal*> nterms, const string& start_name) {
+        auto* start_nonterminal = new NonTerminal("$accept", {make_pair(start_name, nullptr)});
         nterms.sort([](const NonTerminal* a, const NonTerminal* b){ return a->name < b->name; });
         nterms.push_front(start_nonterminal);
         nonterms = nterms;
@@ -59,7 +62,7 @@ public:
 
         for (auto* nt : nonterms) {
             for (const auto& prod : nt->productions) {
-                for (const auto& symbol : prod) {
+                for (const auto& symbol : prod.first) {
                     if (nt_by_name.find(symbol) == nt_by_name.end()) {
                         terminals.push_back(symbol);
                     }
@@ -72,7 +75,8 @@ public:
         for (auto* nt : nonterms) {
             nonterm_offset[nt] = productions.size();
             for (const auto& prod : nt->productions) {
-                productions.push_back(make_pair(nt->name, prod));
+                action_productions.push_back(make_tuple(nt->name, prod.first.size(), prod.second));
+                productions.push_back(make_pair(nt->name, prod.first));
             }
         }
         for (auto* nt : nonterms) {
@@ -84,57 +88,58 @@ public:
 
         build_first_sets(this);
 
-//        // print symbols
-//        cout << "symbols: ";
-//        for (auto s : symbols) {
-//            cout << s << " , ";
-//        }
-//        cout << endl;
-//        // print nonterms
-//        cout << "nonterminals: ";
-//        for (auto* nt : nonterms) {
-//            cout << nt->name << " -> ";
-//            for (auto prod : nt->productions) {
-//                for (auto s: prod) {
-//                    cout << s;
-//                }
-//                cout << " | ";
-//            }
-//            cout << endl;
-//        }
-//        // print terminals
-//        cout << "terminals: ";
-//        for (auto t : terminals) {
-//            cout << t << " , ";
-//        }
-//        cout << endl;
-//        //print nonterm_offset
-//        cout << "nonterm_offset: ";
-//        for (auto elem : nonterm_offset) {
-//            cout << elem.first->name << " = " << elem.second << " ; ";
-//        }        cout << endl;
-//        //print productions
-//        cout << "productions: ";
-//        for (auto elem : productions) {
-//            cout << elem.first << " -> ";
-//            for (auto prod : elem.second) {
-//                if (nt_by_name.find(prod) != nt_by_name.end()) {
-//                    cout << nt_by_name[prod] << "(" << nt_by_name[prod]->name << ")";
-//                } else {
-//                    cout << prod;
-//                }
-//            }
-//            cout << endl;
-//        }
-//        cout << endl;
-//
-//        for (auto s : symbols) {
-//            cout << s << " : ";
-//            for (auto ss : first_set(s)) {
-//                cout << ss << " , ";
-//            }
-//            cout << endl;
-//        }
+        // print symbols
+        cout << "symbols: ";
+        for (auto s : symbols) {
+            cout << s << " , ";
+        }
+        cout << endl;
+        // print nonterms
+        cout << "nonterminals: ";
+        for (auto* nt : nonterms) {
+            cout << nt->name << " -> ";
+            for (auto prod : nt->productions) {
+                for (auto s: prod.first) {
+                    cout << s;
+                }
+                cout << " | ";
+            }
+            cout << endl;
+        }
+        // print terminals
+        cout << "terminals: ";
+        for (auto t : terminals) {
+            cout << t << " , ";
+        }
+        cout << endl;
+        //print nonterm_offset
+        cout << "nonterm_offset: ";
+        for (auto elem : nonterm_offset) {
+            cout << elem.first->name << " = " << elem.second << " ; ";
+        }        cout << endl;
+        //print productions
+        cout << "productions: " << endl;
+        auto i = 0;
+        for (auto elem : productions) {
+            cout << i++ << ") " << elem.first << " -> ";
+            for (auto prod : elem.second) {
+                if (nt_by_name.find(prod) != nt_by_name.end()) {
+                    cout << nt_by_name[prod]->name << " ";
+                } else {
+                    cout << prod << " ";
+                }
+            }
+            cout << endl;
+        }
+        cout << endl;
+
+        for (auto s : symbols) {
+            cout << s << " : ";
+            for (auto ss : first_set(s)) {
+                cout << ss << " , ";
+            }
+            cout << endl;
+        }
     }
 
     set<string> first_set(const string& x) {
@@ -161,7 +166,7 @@ public:
                 auto len_curfs = curfs->size();
 
                 for (const auto& prod : gr->nt_by_name[nt->name]->productions) {
-                    for (const auto& sym : prod) {
+                    for (const auto& sym : prod.first) {
                         curfs->insert(gr->first_sets[sym].begin(), gr->first_sets[sym].end());
                         break;
                     }
