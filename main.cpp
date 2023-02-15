@@ -78,7 +78,8 @@ using Term = pe::Terminal<TokType, Token, t>;
 //extern pe::NTerm<TokType, void> Operator;
 //
 //pe::NTerm<TokType, void> Program =
-//        pe::Rule() << Operator
+//        pe::NTerm<TokType, void>("Program")
+//        | pe::Rule() << Operator
 //        | pe::Rule() << Program << Term<SEMICOLON>() << Operator
 //;
 //
@@ -89,7 +90,8 @@ using Term = pe::Terminal<TokType, Token, t>;
 //extern pe::NTerm<TokType, void> AssignOperator;
 //
 //pe::NTerm<TokType, void> Operator =
-//        pe::Rule() << InputOperator
+//        pe::NTerm<TokType, void>("Operator")
+//        | pe::Rule() << InputOperator
 //        | pe::Rule() << PrintOperator
 //        | pe::Rule() << AssignOperator
 //;
@@ -99,7 +101,8 @@ using Term = pe::Terminal<TokType, Token, t>;
 //extern pe::NTerm<TokType, double*> Variable;
 //
 //pe::NTerm<TokType, void> InputOperator =
-//        pe::Rule() << Term<READ>() << Variable << [](double *variable) -> void { scanf("%lf", variable); }
+//        pe::NTerm<TokType, void>("InputOperator")
+//        | pe::Rule() << Term<READ>() << Variable << [](double *variable) -> void { scanf("%lf", variable); }
 //        | pe::Rule() << InputOperator << Term<COMMA>() << Variable << [](double *variable) -> void { scanf("%lf", variable); }
 //;
 //
@@ -108,7 +111,8 @@ using Term = pe::Terminal<TokType, Token, t>;
 //extern pe::NTerm<TokType, double> Expression;
 //
 //pe::NTerm<TokType, void> PrintOperator =
-//        pe::Rule() << Term<PRINT>() << Expression <<
+//        pe::NTerm<TokType, void>("PrintOperator")
+//        | pe::Rule() << Term<PRINT>() << Expression <<
 //                   [] (double value) -> void {
 //                       printf("%f", value);
 //                   }
@@ -128,7 +132,8 @@ using Term = pe::Terminal<TokType, Token, t>;
 //
 //
 //pe::NTerm<TokType, void> AssignOperator =
-//        pe::Rule() << Variable << Term<SET>() << Expression <<
+//        pe::NTerm<TokType, void>("AssignOperator")
+//        | pe::Rule() << Variable << Term<SET>() << Expression <<
 //                   [](double *variable, double value) -> void {
 //                       *variable = value;
 //                   }
@@ -139,7 +144,8 @@ using Term = pe::Terminal<TokType, Token, t>;
 //std::map<std::string, double> variables;
 //
 //pe::NTerm<TokType, double*> Variable =
-//        pe::Rule() << Term<VARNAME>() <<
+//        pe::NTerm<TokType, double*>("Variable")
+//        | pe::Rule() << Term<VARNAME>() <<
 //                   [](std::string name)-> double* {
 //                       return &variables[name];
 //                   }
@@ -150,19 +156,22 @@ using Term = pe::Terminal<TokType, Token, t>;
 //extern pe::NTerm<TokType, double> ExprTerm;  // Слагаемое
 //
 //pe::NTerm<TokType, double> Expression =
-//        pe::Rule() << ExprTerm
+//        pe::NTerm<TokType, double>("Expression")
+//        | pe::Rule() << ExprTerm
 //        | pe::Rule() << Expression << Term<PLUS>() << ExprTerm <<
 //                     [](double x, double y) -> double { return x + y; }
 //        | pe::Rule() << Expression << Term<MINUS>() << ExprTerm <<
 //                     [](double x, double y) -> double { return x - y; }
 //;
+//// TODO
 //
 //
 //// ExprTerm
 //extern pe::NTerm<TokType, double> Factor;
 //
 //pe::NTerm<TokType, double> ExprTerm =
-//        pe::Rule() << Factor
+//        pe::NTerm<TokType, double>("ExprTerm")
+//        | pe::Rule() << Factor
 //        | pe::Rule() << ExprTerm << Term<MUL>() << Factor <<
 //                     [](double x, double y) -> double { return x * y; }
 //        | pe::Rule() << ExprTerm << Term<DIV>() << Factor <<
@@ -172,16 +181,107 @@ using Term = pe::Terminal<TokType, Token, t>;
 //
 //// Factor
 //pe::NTerm<TokType, double> Factor =
-//        pe::Rule() << Term<NUMBER>()
+//        pe::NTerm<TokType, double>("Factor")
+//        | pe::Rule() << Term<NUMBER>()
 //        | pe::Rule() << Variable << [](double *variable) -> double { return *variable; }
 //        | pe::Rule() << Term<LP>() << Expression << Term<RP>()
 //;
 
-pe::NTerm<TokType, void> F =
-        pe::Rule() << Term<PLUS>() << []() -> void {std::cout << "hello" << "\n";}
-        | pe::Rule() <<
+
+
+//pe::NTerm<TokType, double> F =
+//        pe::NTerm<TokType, double>("F") >>
+//        (pe::Rule() << Term<NUMBER>() << A << Term<PLUS>() << [](double x) -> double {return x;}
+//        | pe::Rule() << Term<NUMBER>() << []() -> double {return 5.0;})
+//;
+
+//pe::NTerm<TokType, double> B =
+//        pe::NTerm<TokType, double>("B")
+//        | pe::Rule() << A << Term<NUMBER>() << Term<PLUS>() << Term<NUMBER>() << [](double x, double y) -> double {return x + y;}
+//        | pe::Rule() << Term<NUMBER>() << Term<MINUS>() << Term<NUMBER>() << A << [](double x, double y) -> double {return x - y;}
+//;
+
+//pe::NTerm<TokType, void> C =
+//        pe::NTerm<TokType, void>("C")
+//        | pe::Chain<TokType, pe::Nil>() << A << A << Term<PLUS>()
+//        | pe::Chain<TokType, pe::Nil>() << Term<MINUS>() << []() -> void {std::cout << "plus";}
+//;
+extern pe::NTerm<TokType, void> A;
+
+pe::NTerm<TokType, void> C =
+        pe::NTerm<TokType, void>("C")
+        | pe::Rule() << C << Term<PLUS>() << A
+        | pe::Rule() << Term<MINUS>() << []() -> void {std::cout << "plus";}
 ;
 
+pe::NTerm<TokType, void> A =
+        pe::NTerm<TokType, void>("A")
+        | pe::Rule() << Term<NUMBER>() << [](double x) -> void {std::cout << x;}
+;
+
+pe::NTerm<TokType, void> D =
+        pe::NTerm<TokType, void>("D")
+        | pe::Chain<TokType, pe::Nil>() << C
+;
+
+// упрощенная грамматика для отладки
+
+extern pe::NTerm<TokType, void> Operator;
+
+pe::NTerm<TokType, void> Program =
+        pe::NTerm<TokType, void>("Program")
+        | pe::Rule() << Operator
+        | pe::Rule() << Program << Term<SEMICOLON>() << Operator
+;
+
+
+extern pe::NTerm<TokType, void> AssignOperator;
+
+pe::NTerm<TokType, void> Operator =
+        pe::NTerm<TokType, void>("Operator")
+        | pe::Rule() << AssignOperator
+;
+
+
+extern pe::NTerm<TokType, double*> Variable;
+extern pe::NTerm<TokType, double> ExprTerm;
+
+pe::NTerm<TokType, void> AssignOperator =
+        pe::NTerm<TokType, void>("AssignOperator")
+        | pe::Rule() << Variable << Term<SET>() << ExprTerm <<
+                     [](double *variable, double value) -> void {
+                         *variable = value;
+                     }
+;
+
+
+std::map<std::string, double> variables;
+
+pe::NTerm<TokType, double*> Variable =
+        pe::NTerm<TokType, double*>("Variable")
+        | pe::Rule() << Term<VARNAME>() <<
+                     [](std::string name)-> double* {
+                         return &variables[name];
+                     }
+;
+
+extern pe::NTerm<TokType, double> Factor;
+
+pe::NTerm<TokType, double> ExprTerm =
+        pe::NTerm<TokType, double>("ExprTerm")
+        | pe::Rule() << Factor
+        | pe::Rule() << ExprTerm << Term<MUL>() << Factor <<
+                     [](double x, double y) -> double { return x * y; }
+        | pe::Rule() << ExprTerm << Term<DIV>() << Factor <<
+                     [](double x, double y) -> double { return x / y; }
+;
+
+
+pe::NTerm<TokType, double> Factor =
+        pe::NTerm<TokType, double>("Factor")
+        | pe::Rule() << Term<NUMBER>()
+        | pe::Rule() << Variable << [](double *variable) -> double { return *variable; }
+;
 
 
 // Лексический анализатор
@@ -264,22 +364,22 @@ struct MyLexer {
 
 // Основная программа
 int main(int argc, char *argv[]) {
-//    if (argc > 1) {
-//        MyLexer lexer(argv[1]);
-//        Program.compile_tables();
-//        Program.parse(lexer);
-//    }
-    auto fr = Fragment({{0, 0}, {0, 0}});
-
-    auto tt = Term<NUMBER>();
-    auto t = Token<PLUS>(fr);
-    auto vt = Token<VARNAME>(fr, "x");
-    auto nt = Token<NUMBER>(fr, 5.0);
-    auto st = Token<STRING>(fr, "text");
-    std::cout << static_cast<char>(t.type) << std::endl;
-    std::cout << static_cast<char>(vt.type) << std::endl;
-    std::cout << static_cast<char>(nt.type) << std::endl;
-    std::cout << static_cast<char>(st.type) << std::endl;
+////    if (argc > 1) {
+////        MyLexer lexer(argv[1]);
+////        Program.compile_tables();
+////        Program.parse(lexer);
+////    }
+//    auto fr = Fragment({{0, 0}, {0, 0}});
+//
+//    auto tt = Term<NUMBER>();
+//    auto t = Token<PLUS>(fr);
+//    auto vt = Token<VARNAME>(fr, "x");
+//    auto nt = Token<NUMBER>(fr, 5.0);
+//    auto st = Token<STRING>(fr, "text");
+//    std::cout << static_cast<char>(t.type) << std::endl;
+//    std::cout << static_cast<char>(vt.type) << std::endl;
+//    std::cout << static_cast<char>(nt.type) << std::endl;
+//    std::cout << static_cast<char>(st.type) << std::endl;
 //    auto *gr = new Grammar({new NonTerminal("P", {"P ';' O", "O"}),
 //                               new NonTerminal("O", {"AO"}),
 //                               new NonTerminal("AO", {"V '=' ET"}),
@@ -287,18 +387,28 @@ int main(int argc, char *argv[]) {
 //                               new NonTerminal("ET", {"F", "ET '*' F"}),
 //                               new NonTerminal("F", {"'n'", "V"})});
 //    auto lalr_one = LalrOne(gr);
-    std::cout << std::endl;
-    auto mylexer = MyLexer();
+//    std::cout << std::endl;
+//    auto mylexer = MyLexer();
 //    mylexer.next_token();
 //    mylexer.next_token();
 //    mylexer.next_token();
-    auto tp = mylexer.next_token();
-    std::cout << "type: " << tp->type << std::endl;
-    if (tp->type == NUMBER) {
-        std::cout << static_cast<pe::AttrToken<TokType, Fragment, double>*>(tp)->value << std::endl;
-    }
-    std::cout << "type: " << mylexer.next_token()->type << std::endl;
-    std::cout << "type: " << mylexer.next_token()->type << std::endl;
+//    auto tp = mylexer.next_token();
+//    std::cout << "type: " << tp->type << std::endl;
+//    if (tp->type == NUMBER) {
+//        std::cout << static_cast<pe::AttrToken<TokType, Fragment, double>*>(tp)->value << std::endl;
+//    }
+//    std::cout << "type: " << mylexer.next_token()->type << std::endl;
+//    std::cout << "type: " << mylexer.next_token()->type << std::endl;
+
+
+
+//    A.print_rules();
+//    C.print_rules();
+//    D.print_rules();
+
+    Program.print_rules();
+//    B.compile_table();
+
 
     return 0;
 }

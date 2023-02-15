@@ -2,8 +2,11 @@
 #define EDSL_CW_PARSER_EDSL_H
 
 #include <iostream>
+#include <utility>
 #include <vector>
 #include <functional>
+#include "Grammar.h"
+#include "LalrOne.h"
 
 namespace parser_edsl {
     template<typename TokType, typename Fragment> struct Token;
@@ -210,51 +213,59 @@ namespace parser_edsl {
         return ChainAction(chain, [](Attr x) { return x; });
     }
 
+    template <typename TokType>
+    auto chain_action_for_chain(Chain<TokType, Nil> chain) {
+        return ChainAction(chain, []() { std::cout << "return Nil" << std::endl; });
+    }
+
     template <typename T> struct Type2Type {};
 
-    template <typename TokType, typename Attrs, typename Action, typename Next>
-    struct DelayedRuleStack {
-        Chain<TokType, Attrs> chain;
-        Action action;
-        Next next;
-
-        DelayedRuleStack(Chain<TokType, Attrs> chain, Action action, Next next)
-            : chain(chain), action(action), next(next)
-        {}
-
-        DelayedRuleStack(ChainAction<TokType, Attrs, Action> ca, Next next)
-            : chain(ca.chain), action(ca.action), next(next)
-        {}
-
-        template <typename Ret>
-        void add_rule_action(std::vector<RuleAction<TokType>> &rule_action, Type2Type<Ret> t2t) {
-            rule_action.push(chain, new ActionRet<Action, Attrs, Ret>(action));
-            next.add_rule_action(rule_action, t2t);
-        }
-
-        void add_rule_action(std::vector<RuleAction<TokType>> &rule_action, Type2Type<void> t2t) {
-            rule_action.push(chain, new ActionNoRet<Action, Attrs>(action));
-            next.add_rule_action(rule_action, t2t);
-        }
-    };
-
-    struct EmptyStack {
-        template <typename TokType, typename T2T>
-        void add_rule_action(std::vector<RuleAction<TokType>> &, T2T) {}
-    };
+//    template <typename TokType, typename Attrs, typename Action, typename Next>
+//    struct DelayedRuleStack {
+//        Chain<TokType, Attrs> chain;
+//        Action action;
+//        Next next;
+//
+//        DelayedRuleStack(Chain<TokType, Attrs> chain, Action action, Next next)
+//            : chain(chain), action(action), next(next)
+//        {}
+//
+//        DelayedRuleStack(ChainAction<TokType, Attrs, Action> ca, Next next)
+//            : chain(ca.chain), action(ca.action), next(next)
+//        {}
+//
+//        template <typename Ret>
+//        void add_rule_action(std::vector<RuleAction<TokType>> &rule_action, Type2Type<Ret> t2t) {
+//            rule_action.push_back(RuleAction<TokType>(chain.symbols, new ActionRet<Action, Attrs, Ret>(action)));
+//            next.add_rule_action(rule_action, t2t);
+//        }
+//
+//        void add_rule_action(std::vector<RuleAction<TokType>> &rule_action, Type2Type<void> t2t) {
+//            rule_action.push_back(RuleAction<TokType>(chain.symbols, new ActionNoRet<Action, Attrs>(action)));
+//            next.add_rule_action(rule_action, t2t);
+//        }
+//    };
+//
+//    struct EmptyStack {
+//        template <typename TokType, typename T2T>
+//        void add_rule_action(std::vector<RuleAction<TokType>> &, T2T) {}
+//    };
 
     template <typename T, typename Attrs>
     struct PushTokenAttr {
-        typedef Attrs Result;
-    };
+        static T* make_object();
 
-    template <typename TokType, typename Fragment, typename Attr, typename Attrs>
-    struct PushTokenAttr<AttrToken<TokType, Fragment, Attr>, Attrs> {
-        typedef Cons<Attr, Attrs> Result;
+        template <typename TokType, typename Fragment, typename Attr>
+        static Cons<Attr, Attrs>
+        push_token_attr(AttrToken<TokType, Fragment, Attr> *);
+
+        static Attrs push_token_attr(...);
+
+        typedef decltype(push_token_attr(make_object())) Result;
     };
 
     template <typename TokType, typename U>
-    constexpr auto operator<< (Rule, NTerm<TokType, U> nterm) {
+    constexpr auto operator<< (Rule, NTerm<TokType, U> &nterm) {
         return Chain<TokType, Nil>() << nterm;
     }
 
@@ -265,14 +276,15 @@ namespace parser_edsl {
 
     template <typename TokType, typename Attrs, typename Attr>
     Chain<TokType, Cons<Attr, Attrs>>
-    operator<< (Chain<TokType, Attrs> chain, NTerm<TokType, Attr> nterm) {
-        chain.symbols.push_back(Symbol(nterm));
-        return chain;
+    operator<< (Chain<TokType, Attrs> chain, NTerm<TokType, Attr> &nterm) {
+        Chain<TokType, Cons<Attr, Attrs>> nc(chain.symbols);
+        nc.symbols.push_back(Symbol(nterm));
+        return nc;
     }
 
     template <typename TokType, typename Attrs>
     Chain<TokType, Attrs>
-    operator<< (Chain<TokType, Attrs> chain, NTerm<TokType, void> nterm) {
+    operator<< (Chain<TokType, Attrs> chain, NTerm<TokType, void> &nterm) {
         chain.symbols.push_back(Symbol(nterm));
         return chain;
     }
@@ -281,50 +293,50 @@ namespace parser_edsl {
     Chain<TokType, typename PushTokenAttr<Token<t>, Attrs>::Result>
     operator<< (Chain<TokType, Attrs> chain, Terminal<TokType, Token, t> term) {
         chain.symbols.push_back(Symbol(term));
-        return chain;
+        Chain<TokType, typename PushTokenAttr<Token<t>, Attrs>::Result> nc(chain.symbols);
+        return nc;
     }
-//
-//    template <typename TokType, typename Attrs>
-//    Chain<TokType, Attrs>
-//    operator<< (Chain<TokType, Attrs> chain, Symbol<TokType> s) {
-//        chain.symbols.push_back(Symbol(s));
-//        return chain;
-//    }
-//
+
     template <typename TokType, typename Attrs, typename Action>
     ChainAction<TokType, Attrs, Action>
     operator<< (Chain<TokType, Attrs> chain, Action action) {
         return ChainAction<TokType, Attrs, Action>(chain, action);
     }
 
-    template <typename Stack, typename TokType, typename Attrs, typename Action>
-    DelayedRuleStack<TokType, Attrs, Action, Stack>
-    operator| (Stack stack, ChainAction<TokType, Attrs, Action> ca) {
-        return DelayedRuleStack<TokType, Attrs, Action, Stack>(ca, stack);
-    }
 
-    template <typename Stack, typename TokType, typename Attrs>
-    auto operator| (Stack stack, Chain<TokType, Attrs> chain) {
-        return stack | chain_action_for_chain(chain);
-    }
+    template <typename TokType>
+    class NTermBase {
+    protected:
+        std::vector<RuleAction<TokType>> rule_actions;
+        std::string name;
 
-    template <typename TokType, typename Attrs1, typename Action1, typename Attrs2, typename Action2>
-    auto operator| (ChainAction<TokType, Attrs1, Action1> ca1, ChainAction<TokType, Attrs2, Action2> ca2) {
-        return (EmptyStack() | ca1) | ca2;
-    }
-
-    template <typename TokType, typename Attrs1, typename Attrs2, typename Action2>
-    auto operator| (Chain<TokType, Attrs1> c1, ChainAction<TokType, Attrs2, Action2> ca2) {
-        return (EmptyStack() | chain_action_for_chain(c1)) | ca2;
-    }
-
+        NTermBase() {}
+        NTermBase(std::string name) : name(std::move(name)) {}
+    public:
+        std::string get_name() {
+            return name;
+        }
+    };
 
     template <typename TokType>
     struct Symbol {
-        virtual ~Symbol() {}
+        bool is_terminal;
+        union {
+            TokType term;
+            NTermBase<TokType> *nterm;
+        } sym;
 
+        template <template<TokType> typename Token, TokType U>
+        Symbol(Terminal<TokType, Token, U> &): is_terminal(true)
+        {
+            sym.term = U;
+        }
 
-        };
+        Symbol(NTermBase<TokType> &nterm): is_terminal(false)
+        {
+            sym.nterm = &nterm;
+        }
+    };
 
     template<typename TokType, typename Fragment>
     struct Token {
@@ -338,8 +350,8 @@ namespace parser_edsl {
         Token(TokType t, Fragment position) {
             pos = position;
             type = t;
-            std::cout << "sizeof(TokType): " << sizeof(TokType) << std::endl;
-            std::cout << "token: " << static_cast<char>(type) << " -> " << type << std::endl;
+//            std::cout << "sizeof(TokType): " << sizeof(TokType) << std::endl;
+//            std::cout << "token: " << static_cast<char>(type) << " -> " << type << std::endl;
 //        std::cout << std::is_enum<TokType>() << std::endl;
         }
     };
@@ -348,8 +360,7 @@ namespace parser_edsl {
     struct AttrToken  : public Token<TokType, Fragment> {
         Fragment pos;
         TokType type;
-        U value;
-        using attr = decltype(value);
+        U value = 0;
 
         AttrToken(TokType t) {
             type = t;
@@ -358,29 +369,92 @@ namespace parser_edsl {
             this->value = value;
             type = t;
             pos = position;
-            std::cout << "attr: " << static_cast<char>(type) << " -> " << type << std::endl;
-            std::cout << "value: " << value << std::endl;
+//            std::cout << "attr: " << static_cast<char>(type) << " -> " << type << std::endl;
+//            std::cout << "value: " << value << std::endl;
         }
     };
 
     template<typename TokType, template<TokType> typename Token, TokType t>
-    struct Terminal : public Symbol<TokType> {
+    struct Terminal {
         TokType T = t;
-        Token<t> token;
         Terminal() {
-            std::cout << "token type: " << token.type << std::endl;
-            std::cout << "term t: " << static_cast<char>(t) << std::endl;
+//            std::cout << "token type: " << token.type << std::endl;
+//            std::cout << "term t: " << static_cast<char>(T) << std::endl;
         }
     };
 
     template<typename TokType, typename U>
-    struct NTerm: public Symbol<TokType> {
-        std::vector<RuleAction<TokType>> rule_actions;
+    struct NTerm: public NTermBase<TokType> {
+        std::vector<pair<std::string, vector<std::string>>> rules;
 
-        template <typename Stack>
-        NTerm(Stack &stack) {
-            stack.add_rule_action(rule_actions, Type2Type<U>());
+        NTerm() : NTermBase<TokType>() {}
+        NTerm(std::string name) : NTermBase<TokType>(name)
+        {}
+
+        template <typename Attrs, typename Action>
+        NTerm<TokType, U>& operator| (ChainAction<TokType, Attrs, Action> ca) {
+            this->rule_actions.push_back(RuleAction<TokType>(ca.chain.symbols, make_action<Attrs>(ca.action, Type2Type<U>())));
+            for (auto rule : this->rule_actions) {
+                std::cout << "rule/op|(" << this->name << ", " << this << ") ";
+                for (auto s : rule.right) {
+                    if (s.is_terminal) {
+                        std::cout << "term: " << s.sym.term << ", ";
+                    } else {
+                        std::cout << "nterm: " << s.sym.nterm << "/" << s.sym.nterm->get_name() << ", ";
+                    }
+                }
+                std::cout << std::endl;
+            }
+            return *this;
         }
+
+        template <typename Attrs>
+        NTerm<TokType, U>& operator| (Chain<TokType, Attrs> chain) {
+            return *this | chain_action_for_chain(chain);
+        }
+
+        NTerm<TokType, U>& operator| (Rule) {
+            return *this | Chain<TokType, Nil>();
+        }
+
+        template <typename Attrs, typename Action, typename Ret>
+        ActionBase *make_action(Action action, Type2Type<Ret>) {
+            return new ActionRet<Action, Attrs, Ret>(action);
+        }
+
+        template <typename Attrs, typename Action>
+        ActionBase *make_action(Action action, Type2Type<void>) {
+            return new ActionNoRet<Action, Attrs>(action);
+        }
+
+        void create_rules(std::vector<pair<std::string, vector<std::string>>>& str_rules, std::vector<std::string> visited) {
+
+        }
+
+        void compile_table() {
+            std::cout << "compile tables";
+
+        }
+
+        auto get_rules() {
+            return this->rule_actions;
+        };
+
+        void print_rules() {
+            std::cout << "print_rules(" << this->get_name() << ")\n";
+            for (auto rule : this->rule_actions) {
+                std::cout << "rule: ";
+                for (auto s : rule.right) {
+                    if (s.is_terminal) {
+                        std::cout << "term: " << s.sym.term << "(" << (char) s.sym.term << "), ";
+                    } else {
+                        std::cout << "nterm: " << s.sym.nterm->get_name() << ", ";
+                    }
+                }
+                std::cout << std::endl;
+            }
+        }
+
     };
 }
 
