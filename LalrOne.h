@@ -30,7 +30,7 @@ public:
         gr = grammar;
 
         terminals = gr->terminals;
-        terminals.emplace_back("$end");
+        terminals.emplace_back("0");
         for (auto* nt : gr->nonterms) {
             if (nt != gr->nonterms.front()) {
                 nonterms.push_back(nt);
@@ -117,7 +117,7 @@ public:
                     action[state_id][terminal].insert(make_pair("s", next_state_id));
                 } else {
                     if (prod_index == 0) {
-                        action[state_id]["$end"].insert(make_pair("acc", -1));
+                        action[state_id]["0"].insert(make_pair("acc", -1));
                     } else {
                         action[state_id][next_symbol].insert(make_pair("r", prod_index));
                     }
@@ -138,14 +138,17 @@ public:
 
     pair<string, int> get_next_action(int state, int term) {
         string s;
-        s += (char) term;
-        if (term == 0) {
-            s = "$end";
+        s = term == 0 ? "0" : s += (char) term;
+        if (action[state].find(s) == action[state].end()) {
+            return make_pair("error", -1);
         }
         return *action[state][s].begin();
     }
 
     int get_next_goto(int state, const string& nterm) {
+        if (goto_[state].find(nterm) == goto_[state].end()) {
+            return -1;
+        }
         return goto_[state][nterm];
     }
 
@@ -198,7 +201,7 @@ public:
             }
             table.push_back(m);
         }
-        table[0][make_pair(0, 0)]->lookaheads.insert("$end");
+        table[0][make_pair(0, 0)]->lookaheads.insert("0");
 
         for (auto i_state_id = 0; i_state_id < n_states; i_state_id++) {
             vector<string> state_symbols;

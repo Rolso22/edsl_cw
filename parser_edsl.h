@@ -46,7 +46,7 @@ namespace parser_edsl {
 
         ActionRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             Ret r = action();
             stack.push(r);
         }
@@ -58,7 +58,7 @@ namespace parser_edsl {
 
         ActionRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             A1 a1 = stack.pop<A1>();
             Ret r = action(a1);
             stack.push(r);
@@ -71,7 +71,7 @@ namespace parser_edsl {
 
         ActionRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             A1 a1 = stack.pop<A1>();
             A2 a2 = stack.pop<A2>();
             Ret r = action(a2, a1);
@@ -103,7 +103,7 @@ namespace parser_edsl {
 
         ActionNoRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             action();
         }
     };
@@ -114,7 +114,7 @@ namespace parser_edsl {
 
         ActionNoRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             A1 a1 = stack.pop<A1>();
             action(a1);
         }
@@ -126,7 +126,7 @@ namespace parser_edsl {
 
         ActionNoRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             A1 a1 = stack.pop<A1>();
             A2 a2 = stack.pop<A2>();
             action(a2, a1);
@@ -139,7 +139,7 @@ namespace parser_edsl {
 
         ActionNoRet(F f): action(f) {}
 
-        virtual void apply(AttrStack &stack) override {
+        void apply(AttrStack &stack) override {
             A1 a1 = stack.pop<A1>();
             A2 a2 = stack.pop<A2>();
             A3 a3 = stack.pop<A3>();
@@ -182,7 +182,7 @@ namespace parser_edsl {
 
     template <typename TokType>
     auto chain_action_for_chain(Chain<TokType, Nil> chain) {
-        return ChainAction(chain, []() { std::cout << "return Nil" << std::endl; });
+        return ChainAction(chain, []() {});
     }
 
     template <typename T> struct Type2Type {};
@@ -308,7 +308,7 @@ namespace parser_edsl {
         }
 
         virtual void get_attr(AttrStack& stack) {
-            std::cout << "token push nothing" << std::endl;
+//            std::cout << "token push nothing" << std::endl;
         }
     };
 
@@ -325,7 +325,7 @@ namespace parser_edsl {
         }
 
         void get_attr(AttrStack& stack) override {
-            std::cout << "attr_token push value" << std::endl;
+//            std::cout << "attr_token push value" << std::endl;
             stack.template push(value);
         }
     };
@@ -418,14 +418,24 @@ namespace parser_edsl {
                     state_stack.push(next_action.second);
                     next_token = lexer.next_token();
                 } else if (next_action.first == "r") {
-                    std::get<2>(all_action_rules[next_action.second])->apply(*stack);
-                    for (auto i = 0; i < std::get<1>(all_action_rules[next_action.second]); i++) {
+                    const auto [nterm, prod_size, action] = all_action_rules[next_action.second];
+                    action->apply(*stack);
+                    for (auto i = 0; i < prod_size; i++) {
                         state_stack.pop();
                     }
-                    auto next_state = lalr_one.get_next_goto(state_stack.top(), std::get<0>(all_action_rules[next_action.second]));
+                    auto next_state = lalr_one.get_next_goto(state_stack.top(), nterm);
+                    if (next_state == -1) {
+                        std::cout << "\nerror reduce: (" << next_token->pos.begin.line << ", " << next_token->pos.begin.col << ") - " <<
+                                  "(" << next_token->pos.end.line << ", " << next_token->pos.end.col << ")" << std::endl;
+                        break;
+                    }
                     state_stack.push(next_state);
+                } else if (next_action.first == "acc") {
+                    std::cout << "\nparsing is done: accept" << std::endl;
+                    break;
                 } else {
-                    std::cout << "parsing is done: accept" << std::endl;
+                    std::cout << "\nerror shift: (" << next_token->pos.begin.line << ", " << next_token->pos.begin.col << ") - " <<
+                              "(" << next_token->pos.end.line << ", " << next_token->pos.end.col << ")" << std::endl;
                     break;
                 }
             }
