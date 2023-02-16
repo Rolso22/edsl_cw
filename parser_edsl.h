@@ -403,13 +403,13 @@ namespace parser_edsl {
             state_stack.push(0);
             auto next_token = lexer.next_token();
             while (true) {
-                auto next_action = lalr_one.get_next_action(state_stack.top(), next_token->type);
-                if (next_action.first == "s") {
+                const auto [rule, state] = lalr_one.get_next_action(state_stack.top(), next_token->type);
+                if (rule == "s") {
                     next_token->get_attr(*stack);
-                    state_stack.push(next_action.second);
+                    state_stack.push(state);
                     next_token = lexer.next_token();
-                } else if (next_action.first == "r") {
-                    const auto [nterm, prod_size, action] = all_action_rules[next_action.second];
+                } else if (rule == "r") {
+                    const auto [nterm, prod_size, action] = all_action_rules[state];
                     action->apply(*stack);
                     for (auto i = 0; i < prod_size; i++) {
                         state_stack.pop();
@@ -421,7 +421,7 @@ namespace parser_edsl {
                         break;
                     }
                     state_stack.push(next_state);
-                } else if (next_action.first == "acc") {
+                } else if (rule == "acc") {
                     std::cout << "\nparsing is done: accept" << std::endl;
                     break;
                 } else {

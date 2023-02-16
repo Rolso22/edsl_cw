@@ -125,7 +125,7 @@ std::map<std::string, double> variables;
 pe::NTerm<TokType, double*> Variable =
         pe::NTerm<TokType, double*>("Variable")
         | pe::Rule() << Term<VARNAME>() <<
-                   [](std::string name)-> double* {
+                   [](const std::string& name)-> double* {
                        return &variables[name];
                    }
 ;
