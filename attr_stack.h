@@ -1,7 +1,3 @@
-//
-// Created by ramagf on 15.02.23.
-//
-
 #ifndef EDSL_CW_ATTR_STACK_H
 #define EDSL_CW_ATTR_STACK_H
 

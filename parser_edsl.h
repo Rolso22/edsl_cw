@@ -307,9 +307,7 @@ namespace parser_edsl {
             type = t;
         }
 
-        virtual void get_attr(AttrStack& stack) {
-//            std::cout << "token push nothing" << std::endl;
-        }
+        virtual void get_attr(AttrStack& stack) {}
     };
 
     template<typename TokType, typename Fragment, typename U>
@@ -325,7 +323,6 @@ namespace parser_edsl {
         }
 
         void get_attr(AttrStack& stack) override {
-//            std::cout << "attr_token push value" << std::endl;
             stack.template push(value);
         }
     };
@@ -333,10 +330,7 @@ namespace parser_edsl {
     template<typename TokType, template<TokType> typename Token, TokType t>
     struct Terminal {
         TokType T = t;
-        Terminal() {
-//            std::cout << "token type: " << token.type << std::endl;
-//            std::cout << "term t: " << static_cast<char>(T) << std::endl;
-        }
+        Terminal() {}
     };
 
     template<typename TokType, typename U>
