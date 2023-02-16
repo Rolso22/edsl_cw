@@ -241,8 +241,7 @@ struct MyLexer : public pe::Lexer<TokType, Fragment> {
             if (tp.empty()) {
                 return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
             }
-            pe::Token<TokType, Fragment>* t = get_type(tp);
-            return t;
+            return get_type(tp);
         } else {
             std::cout << "file is closed" << std::endl;
         }
@@ -257,6 +256,5 @@ int main(int argc, char *argv[]) {
         Program.compile_table();
         Program.parse(lexer);
     }
-
     return 0;
 }

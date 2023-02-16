@@ -20,9 +20,7 @@ namespace parser_edsl {
     template <typename TokType, typename Fragment>
     struct Lexer {
 
-        virtual Token<TokType, Fragment>* next_token() {
-            std::cout << "next token" << std::endl;
-        }
+        virtual Token<TokType, Fragment>* next_token() {}
 
         virtual ~Lexer() {}
     };
