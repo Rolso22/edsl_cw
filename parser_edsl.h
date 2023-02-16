@@ -378,7 +378,6 @@ namespace parser_edsl {
         }
 
         void compile_table() {
-//            std::cout << "compile tables" << std::endl;
             std::vector<std::string> visited;
             this->create_rules(rules, visited);
 //            for (auto rule : this->rules) {
