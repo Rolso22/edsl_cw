@@ -175,9 +175,9 @@ struct MyLexer : public pe::Lexer<TokType, Fragment> {
     MyLexer(const char *input_file) {
         file_path = input_file;
         file.open(file_path,ios::in);
-        if (file.is_open()) {
-            std::cout << "open" << std::endl;
-        }
+//        if (file.is_open()) {
+//            std::cout << "open" << std::endl;
+//        }
     };
 
     pe::Token<TokType, Fragment>* get_type(const std::string& t) {

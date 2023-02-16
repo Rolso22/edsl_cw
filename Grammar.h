@@ -88,58 +88,58 @@ public:
 
         build_first_sets(this);
 
-        // print symbols
-        cout << "symbols: ";
-        for (auto s : symbols) {
-            cout << s << " , ";
-        }
-        cout << endl;
-        // print nonterms
-        cout << "nonterminals: ";
-        for (auto* nt : nonterms) {
-            cout << nt->name << " -> ";
-            for (auto prod : nt->productions) {
-                for (auto s: prod.first) {
-                    cout << s;
-                }
-                cout << " | ";
-            }
-            cout << endl;
-        }
-        // print terminals
-        cout << "terminals: ";
-        for (auto t : terminals) {
-            cout << t << " , ";
-        }
-        cout << endl;
-        //print nonterm_offset
-        cout << "nonterm_offset: ";
-        for (auto elem : nonterm_offset) {
-            cout << elem.first->name << " = " << elem.second << " ; ";
-        }        cout << endl;
-        //print productions
-        cout << "productions: " << endl;
-        auto i = 0;
-        for (auto elem : productions) {
-            cout << i++ << ") " << elem.first << " -> ";
-            for (auto prod : elem.second) {
-                if (nt_by_name.find(prod) != nt_by_name.end()) {
-                    cout << nt_by_name[prod]->name << " ";
-                } else {
-                    cout << prod << " ";
-                }
-            }
-            cout << endl;
-        }
-        cout << endl;
-
-        for (auto s : symbols) {
-            cout << s << " : ";
-            for (auto ss : first_set(s)) {
-                cout << ss << " , ";
-            }
-            cout << endl;
-        }
+//        // print symbols
+//        cout << "symbols: ";
+//        for (auto s : symbols) {
+//            cout << s << " , ";
+//        }
+//        cout << endl;
+//        // print nonterms
+//        cout << "nonterminals: ";
+//        for (auto* nt : nonterms) {
+//            cout << nt->name << " -> ";
+//            for (auto prod : nt->productions) {
+//                for (auto s: prod.first) {
+//                    cout << s;
+//                }
+//                cout << " | ";
+//            }
+//            cout << endl;
+//        }
+//        // print terminals
+//        cout << "terminals: ";
+//        for (auto t : terminals) {
+//            cout << t << " , ";
+//        }
+//        cout << endl;
+//        //print nonterm_offset
+//        cout << "nonterm_offset: ";
+//        for (auto elem : nonterm_offset) {
+//            cout << elem.first->name << " = " << elem.second << " ; ";
+//        }        cout << endl;
+//        //print productions
+//        cout << "productions: " << endl;
+//        auto i = 0;
+//        for (auto elem : productions) {
+//            cout << i++ << ") " << elem.first << " -> ";
+//            for (auto prod : elem.second) {
+//                if (nt_by_name.find(prod) != nt_by_name.end()) {
+//                    cout << nt_by_name[prod]->name << " ";
+//                } else {
+//                    cout << prod << " ";
+//                }
+//            }
+//            cout << endl;
+//        }
+//        cout << endl;
+//
+//        for (auto s : symbols) {
+//            cout << s << " : ";
+//            for (auto ss : first_set(s)) {
+//                cout << ss << " , ";
+//            }
+//            cout << endl;
+//        }
     }
 
     set<string> first_set(const string& x) {

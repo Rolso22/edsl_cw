@@ -132,8 +132,8 @@ public:
                 goto_[state_id][name] = next_state_id;
             }
         }
-        print_goto(goto_);
-        print_action(action);
+//        print_goto(goto_);
+//        print_action(action);
     }
 
     pair<string, int> get_next_action(int state, int term) {
