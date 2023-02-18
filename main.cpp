@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <queue>
 
 #include "parser_edsl.h"
 
@@ -175,77 +176,118 @@ struct MyLexer : public pe::Lexer<TokType, Fragment> {
     MyLexer(const char *input_file) {
         file_path = input_file;
         file.open(file_path,ios::in);
-//        if (file.is_open()) {
-//            std::cout << "open" << std::endl;
-//        }
+        read_file();
     };
 
-    pe::Token<TokType, Fragment>* get_type(const std::string& t) {
-        std::string delimiter = " ";
-        std::string token = t.substr(0, t.find(delimiter));
-        if (token == "PLUS") {
-            return new Token<PLUS>(Fragment({{begin, 0}, {begin++, 4}}));
+    std::vector<pe::Token<TokType, Fragment>*> tokens;
+    int cur = 0;
+
+    void read_file() {
+        if (file.is_open()) {
+            string tp;
+            int start = 1;
+            while (true) {
+                getline(file, tp);
+                if (tp == "0") {
+                    tokens.push_back(new Token<END_OF_TEXT>(Fragment({{start, 0}, {start, 1}})));
+                    break;
+                }
+                auto len = tp.size();
+                for (auto i = 0; i < len;) {
+                    auto col = i;
+                    auto next = tp[i];
+                    switch(next) {
+                        case ' ':
+                            i++;
+                            break;
+                        case 'v':
+                        {
+                            col = i;
+                            i += 4;
+                            string var_name;
+                            for (; i < len && tp[i] != ' '; i++) {
+                                var_name += tp[i];
+                            }
+                            tokens.push_back(new Token<VARNAME>(Fragment({{start, col}, {start, i-1}}), var_name));
+                            break;
+                        }
+                        case '"':
+                        {
+                            col = i;
+                            i++;
+                            string str;
+                            for (; tp[i] != '"'; i++) {
+                                str += tp[i];
+                            }
+                            tokens.push_back(new Token<STRING>(Fragment({{start, col}, {start, ++i}}), str));
+                            break;
+                        }
+                        case 'r':
+                        {
+                            col = i;
+                            i+= 4;
+                            tokens.push_back(new Token<READ>(Fragment({{start, col}, {start, i-1}})));
+                            break;
+                        }
+                        case 'p':
+                        {
+                            col = i;
+                            i+= 5;
+                            tokens.push_back(new Token<PRINT>(Fragment({{start, col}, {start, i-1}})));
+                            break;
+                        }
+                        case '=':
+                            tokens.push_back(new Token<SET>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case '(':
+                            tokens.push_back(new Token<LP>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case ')':
+                            tokens.push_back(new Token<RP>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case '+':
+                            tokens.push_back(new Token<PLUS>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case '-':
+                            tokens.push_back(new Token<MINUS>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case '*':
+                            tokens.push_back(new Token<MUL>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case '/':
+                            tokens.push_back(new Token<DIV>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case ';':
+                            tokens.push_back(new Token<SEMICOLON>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case ',':
+                            tokens.push_back(new Token<COMMA>(Fragment({{start, col}, {start, i++}})));
+                            break;
+                        case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+                        {
+                            col = i;
+                            string number;
+                            number += next;
+                            for (i++; i < len && tp[i] != ' '; i++) {
+                                number += tp[i];
+                            }
+                            tokens.push_back(new Token<NUMBER>(Fragment({{start, col}, {start, i++}}), std::stod(number)));
+                            break;
+                        }
+                        default:
+                            i++;
+                            std::cout << "default:" << next << std::endl;
+                            break;
+                    }
+                }
+                start++;
+            }
+
         }
-        if (token == "MINUS") {
-            return new Token<MINUS>(Fragment({{begin, 0}, {begin++, 5}}));
-        }
-        if (token == "MUL") {
-            return new Token<MUL>(Fragment({{begin, 0}, {begin++, 3}}));
-        }
-        if (token == "DIV") {
-            return new Token<DIV>(Fragment({{begin, 0}, {begin++, 3}}));
-        }
-        if (token == "SET") {
-            return new Token<SET>(Fragment({{begin, 0}, {begin++, 3}}));
-        }
-        if (token == "SEMICOLON") {
-            return new Token<SEMICOLON>(Fragment({{begin, 0}, {begin++, 7}}));
-        }
-        if (token == "COMMA") {
-            return new Token<COMMA>(Fragment({{begin, 0}, {begin++, 5}}));
-        }
-        if (token == "LP") {
-            return new Token<LP>(Fragment({{begin, 0}, {begin++, 2}}));
-        }
-        if (token == "RP") {
-            return new Token<RP>(Fragment({{begin, 0}, {begin++, 2}}));
-        }
-        if (token == "PRINT") {
-            return new Token<PRINT>(Fragment({{begin, 0}, {begin++, 5}}));
-        }
-        if (token == "READ") {
-            return new Token<READ>(Fragment({{begin, 0}, {begin++, 4}}));
-        }
-        if (token == "NUMBER") {
-            std::string value = t.substr(t.find(delimiter));
-            value = value.substr(1, value.size());
-            return new Token<NUMBER>(Fragment({{begin, 0}, {begin++, 6}}), std::stod(value));
-        }
-        if (token == "VARNAME") {
-            std::string value = t.substr(t.find(delimiter));
-            value = value.substr(1, value.size());
-            return new Token<VARNAME>(Fragment({{begin, 0}, {begin++, 6}}), value);
-        }
-        if (token == "STRING") {
-            std::string value = t.substr(t.find(delimiter));
-            value = value.substr(1, value.size());
-            return new Token<STRING>(Fragment({{begin, 0}, {begin++, 6}}), value);
-        }
-        return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
     }
 
     pe::Token<TokType, Fragment>* next_token() {
-        if (file.is_open()) {
-            string tp;
-            getline(file, tp);
-            if (tp.empty()) {
-                return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
-            }
-            return get_type(tp);
-        } else {
-            std::cout << "file is closed" << std::endl;
-        }
-        return new Token<END_OF_TEXT>(Fragment({{begin, 0}, {begin++, 3}}));
+        return tokens[cur++];
     }
 };
 

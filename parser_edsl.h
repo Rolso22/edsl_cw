@@ -245,6 +245,7 @@ namespace parser_edsl {
         std::string name;
 
         NTermBase(std::string name) : name(std::move(name)) {}
+
     public:
         std::string get_name() {
             return name;
@@ -300,12 +301,9 @@ namespace parser_edsl {
         Fragment pos;
         TokType type;
 
-        Token(TokType t, Fragment position) {
-            pos = position;
-            type = t;
-        }
+        Token(TokType t, Fragment position) : type(t), pos(position) {}
 
-        virtual void get_attr(AttrStack& stack) {}
+        virtual void push_attr(AttrStack& stack) {}
     };
 
     template<typename TokType, typename Fragment, typename U>
@@ -314,14 +312,11 @@ namespace parser_edsl {
         TokType type;
         U value;
 
-        AttrToken(TokType t, Fragment position, U value) : Token<TokType, Fragment>(t, position) {
-            this->value = value;
-            type = t;
-            pos = position;
-        }
+        AttrToken(TokType t, Fragment position, U value) : Token<TokType, Fragment>(t, position),
+                value(value), type(t), pos(position) {}
 
-        void get_attr(AttrStack& stack) override {
-            stack.template push(value);
+        void push_attr(AttrStack& stack) override {
+            stack.push(value);
         }
     };
 
@@ -403,13 +398,13 @@ namespace parser_edsl {
             state_stack.push(0);
             auto next_token = lexer.next_token();
             while (true) {
-                const auto [rule, state] = lalr_one.get_next_action(state_stack.top(), next_token->type);
+                const auto [rule, number] = lalr_one.get_next_action(state_stack.top(), next_token->type);
                 if (rule == "s") {
-                    next_token->get_attr(*stack);
-                    state_stack.push(state);
+                    next_token->push_attr(*stack);
+                    state_stack.push(number);
                     next_token = lexer.next_token();
                 } else if (rule == "r") {
-                    const auto [nterm, prod_size, action] = all_action_rules[state];
+                    const auto [nterm, prod_size, action] = all_action_rules[number];
                     action->apply(*stack);
                     for (auto i = 0; i < prod_size; i++) {
                         state_stack.pop();

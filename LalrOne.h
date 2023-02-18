@@ -138,7 +138,7 @@ public:
 
     pair<string, int> get_next_action(int state, int term) {
         string s;
-        s = term == 0 ? "0" : s += (char) term;
+        s += term == 0 ? '0' : (char) term;
         if (action[state].find(s) == action[state].end()) {
             return make_pair("error", -1);
         }
